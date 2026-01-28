@@ -1035,6 +1035,23 @@ litellm_append_user_content_test_cases = [
         4,
         id="user content is not the last message scenario",
     ),
+    pytest.param(
+        LlmRequest(
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[
+                        types.Part.from_function_response(
+                            name="test_function",
+                            response={"result": "test_result"},
+                        )
+                    ],
+                ),
+            ]
+        ),
+        1,
+        id="user content with function_response has payload",
+    ),
 ]
 
 
