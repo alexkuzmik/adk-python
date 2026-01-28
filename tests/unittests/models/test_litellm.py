@@ -990,6 +990,47 @@ async def test_generate_content_async_adds_fallback_user_message(
   )
 
 
+@pytest.mark.asyncio
+async def test_generate_content_async_no_fallback_for_function_response(
+    mock_acompletion, lite_llm_instance
+):
+  """Tests that no fallback message is added for a user message with a function response."""
+  llm_request = LlmRequest(
+      contents=[
+          types.Content(
+              role="user",
+              parts=[
+                  types.Part.from_function_response(
+                      name="test_function",
+                      response={"result": "test_result"},
+                  )
+              ],
+          )
+      ]
+  )
+
+  # Run generate_content_async which calls _append_fallback_user_content_if_missing
+  async for _ in lite_llm_instance.generate_content_async(llm_request):
+    pass
+
+  # Verify that the fallback message was NOT added to the llm_request
+  assert len(llm_request.contents) == 1
+  assert len(llm_request.contents[0].parts) == 1
+  assert llm_request.contents[0].parts[0].function_response is not None
+
+  # Verify that the message sent to litellm does not contain the fallback text
+  mock_acompletion.assert_called_once()
+  _, kwargs = mock_acompletion.call_args
+  user_messages = [
+      message for message in kwargs["messages"] if message["role"] == "user"
+  ]
+  assert not any(
+      message.get("content")
+      == "Handle the requests as specified in the System Instruction."
+      for message in user_messages
+  )
+
+
 litellm_append_user_content_test_cases = [
     pytest.param(
         LlmRequest(
@@ -1034,23 +1075,6 @@ litellm_append_user_content_test_cases = [
         ),
         4,
         id="user content is not the last message scenario",
-    ),
-    pytest.param(
-        LlmRequest(
-            contents=[
-                types.Content(
-                    role="user",
-                    parts=[
-                        types.Part.from_function_response(
-                            name="test_function",
-                            response={"result": "test_result"},
-                        )
-                    ],
-                ),
-            ]
-        ),
-        1,
-        id="user content with function_response has payload",
     ),
 ]
 
